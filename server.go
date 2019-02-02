@@ -9,7 +9,7 @@ import (
 )
 
 // HandlerFunc defines the handler interface.
-type HandlerFunc func(c Conn)
+type HandlerFunc func(c *Context)
 
 // Logger must be implemented by any logger.
 type Logger interface {
@@ -33,25 +33,18 @@ type Server struct {
 	log          Logger
 }
 
-func (s *Server) errorf(format string, a ...interface{}) {
+func (s *Server) errorf(format string, v ...interface{}) {
 	if s.log == nil {
 		return
 	}
-	s.log.Errorf(format, a...)
+	s.log.Errorf(format, v...)
 }
 
-func (s *Server) printf(format string, a ...interface{}) {
+func (s *Server) printf(format string, v ...interface{}) {
 	if s.log == nil {
 		return
 	}
-	s.log.Printf(format, a...)
-}
-
-// SYN allows to handle each new connection / client.
-func (s *Server) SYN(f ...HandlerFunc) {
-	if f != nil {
-		s.in = append(s.in, f...)
-	}
+	s.log.Printf(format, v...)
 }
 
 // ACK allows to handle each new message.
@@ -61,10 +54,17 @@ func (s *Server) ACK(f ...HandlerFunc) {
 	}
 }
 
-// FIN allows to handle when the client connection is closed.
+// FIN allows to handle when the Context connection is closed.
 func (s *Server) FIN(f ...HandlerFunc) {
 	if f != nil {
 		s.out = append(s.out, f...)
+	}
+}
+
+// SYN allows to handle each new connection / Context.
+func (s *Server) SYN(f ...HandlerFunc) {
+	if f != nil {
+		s.in = append(s.in, f...)
 	}
 }
 
@@ -89,7 +89,7 @@ func (s *Server) Run(addr string) error {
 		if err != nil {
 			return err
 		}
-		x := &client{
+		x := &Context{
 			conn: c,
 			srv:  s,
 		}
