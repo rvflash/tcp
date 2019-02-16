@@ -2,61 +2,53 @@ package tcp
 
 import (
 	"io"
-	"net"
 )
 
-const noWritten = 1
-
-// ResponseWriter interface is used by an TCP handler to construct the response.
+// ResponseWriter interface is used by a TCP handler to write the response.
 type ResponseWriter interface {
-	// Writer is the interface that wraps the basic Write method.
-	io.Writer
-	// WriteString allow to directly write string.
-	WriteString(s string) (n int, err error)
-	// Size returns the number of bytes already written into the response body.
-	// -1: not already written
-	Size() int
+	io.WriteCloser
 }
 
 type responseWriter struct {
-	conn io.Writer
+	ResponseWriter
 	size int
 }
 
-func newResponseWriter(c net.Conn) *responseWriter {
-	return &responseWriter{
-		conn: c,
-		size: noWritten,
-	}
+const noWritten = -1
+
+// Close implements the ResponseWriter interface.
+func (r *responseWriter) Close() error {
+	return r.ResponseWriter.Close()
+}
+
+// Size returns the number of bytes already written into the response body.
+// -1: not already written
+func (r *responseWriter) Size() int {
+	return r.size
 }
 
 // Write implements the ResponseWriter interface.
-func (w *responseWriter) Size() int {
-	return w.size
-}
-
-// Write implements the ResponseWriter interface.
-func (w *responseWriter) Write(p []byte) (n int, err error) {
-	n, err = w.conn.Write(p)
-	w.incr(n)
+func (r *responseWriter) Write(p []byte) (n int, err error) {
+	n, err = r.ResponseWriter.Write(p)
+	r.incr(n)
 	return
 }
 
-// Write implements the ResponseWriter interface.
-func (w *responseWriter) WriteString(s string) (n int, err error) {
-	n, err = io.WriteString(w.conn, s)
-	w.incr(n)
+// WriteString allows to directly write string.
+func (r *responseWriter) WriteString(s string) (n int, err error) {
+	n, err = io.WriteString(r.ResponseWriter, s)
+	r.incr(n)
 	return
 }
 
-func (w *responseWriter) incr(n int) {
+func (r *responseWriter) incr(n int) {
 	if n == noWritten {
 		n = 0
 	}
-	w.size += n
+	r.size += n
 }
 
-func (w *responseWriter) rebase(conn io.Writer) {
-	w.conn = conn
-	w.size = noWritten
+func (r *responseWriter) rebase(w ResponseWriter) {
+	r.ResponseWriter = w
+	r.size = noWritten
 }

@@ -8,13 +8,18 @@ import (
 	"time"
 )
 
-// HandlerFunc defines the handler interface.
+// Handler responds to a TCP request.
+type Handler interface {
+	ServeTCP(ResponseWriter, *Request)
+}
+
+// HandlerFunc defines the handler interface used as return value.
 type HandlerFunc func(c *Context)
 
 // Router is implemented by the Server.
 type Router interface {
-	// Any registers a route that matches one of supported method
-	Any(method string, handler ...HandlerFunc) Router
+	// Any registers a route that matches one of supported segment
+	Any(segment string, handler ...HandlerFunc) Router
 	// Use adds middleware fo any context: start and end of connection and message.
 	Use(handler ...HandlerFunc) Router
 	// ACK is a shortcut for Any("ACK", ...HandlerFunc).
@@ -25,7 +30,7 @@ type Router interface {
 	SYN(handler ...HandlerFunc) Router
 }
 
-// List of supported "methods".
+// List of supported segments.
 const (
 	ANY = ""
 	ACK = "ACK"
@@ -61,19 +66,19 @@ type Server struct {
 }
 
 func (s *Server) allocateContext() *Context {
-	return &Context{}
+	return &Context{srv: s}
 }
 
-func (s *Server) computeHandlers(handlers []HandlerFunc) []HandlerFunc {
-	m := make([]HandlerFunc, len(s.handlers[ANY])+len(handlers))
+func (s *Server) computeHandlers(segment string) []HandlerFunc {
+	m := make([]HandlerFunc, len(s.handlers[ANY])+len(s.handlers[segment]))
 	copy(m, s.handlers[ANY])
-	copy(m[len(s.handlers[ANY]):], handlers)
+	copy(m[len(s.handlers[ANY]):], s.handlers[segment])
 	return m
 }
 
-// Any
-func (s *Server) Any(method string, f ...HandlerFunc) Router {
-	switch method {
+// Any attaches handlers on the given segment.
+func (s *Server) Any(segment string, f ...HandlerFunc) Router {
+	switch segment {
 	case ACK:
 		return s.ACK(f...)
 	case FIN:
@@ -103,7 +108,7 @@ func (s *Server) SYN(f ...HandlerFunc) Router {
 	return s
 }
 
-// Use adds middleware(s).
+// Use adds middleware(s) on all segments.
 func (s *Server) Use(f ...HandlerFunc) Router {
 	s.handlers[ANY] = append(s.handlers[ANY], f...)
 	return s
@@ -125,23 +130,11 @@ func (s *Server) Run(addr string) (err error) {
 	for {
 		c, err := newConn(l, s.ReadTimeout)
 		if err != nil {
-			return
+			return err
 		}
-		r, err := newRequest(c, ctx)
-		if err != nil {
-			return
-		}
-		w := newResponseWriter(c)
-		// flag request as SYN and repeat the action...
-		go s.ServeTCP(w, r)
+		rwc := s.newConn(ctx, c)
+		go rwc.serve()
 	}
-}
-
-func (s *Server) handle(c *Context) {
-	if c.handlers == nil {
-		return
-	}
-	c.Next()
 }
 
 func newConn(l net.Listener, to time.Duration) (net.Conn, error) {
@@ -150,7 +143,6 @@ func newConn(l net.Listener, to time.Duration) (net.Conn, error) {
 		return nil, err
 	}
 	if to == 0 {
-		// no read deadline required.
 		return c, err
 	}
 	err = c.SetReadDeadline(time.Now().Add(to))
@@ -160,24 +152,19 @@ func newConn(l net.Listener, to time.Duration) (net.Conn, error) {
 	return c, nil
 }
 
-func newRequest(c net.Conn, ctx context.Context) (*Request, error) {
-	req, err := NewRequest(SYN, nil)
-	if err != nil || c == nil || ctx == nil {
-		return nil, err
+func (s *Server) newConn(ctx context.Context, c net.Conn) *conn {
+	return &conn{
+		addr: c.RemoteAddr().String(),
+		ctx:  ctx,
+		srv:  s,
+		rwc:  c,
 	}
-	// Retrieves the remote address of the client.
-	req.RemoteAddr = c.RemoteAddr().String()
-
-	// Initiates the connection with a context by cancellation.
-	return req.WithCancel(ctx), nil
 }
 
-// ServeTCP ...
-func (s *Server) ServeTCP(w ResponseWriter, req *Request) {
-	c := s.pool.Get().(*Context)
-	c.writer.rebase(w)
-	c.Request = req
-	c.reset()
-	s.handle(c)
+func (s *Server) put(c *Context) {
 	s.pool.Put(c)
+}
+
+func (s *Server) get() *Context {
+	return s.pool.Get().(*Context)
 }

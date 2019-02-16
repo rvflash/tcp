@@ -1,40 +1,42 @@
 package tcp
 
 import (
-	"bufio"
-	"net"
+	"io/ioutil"
 	"strings"
+	"time"
 )
 
-// Context ...
-type Context struct {
-	Request *Request
-	ResponseWriter
+// M is a shortcut for map[string]interface{}
+type M map[string]interface{}
 
-	conn     net.Conn
+// Context allows us to pass variables between middleware and manage the flow.
+type Context struct {
+	//Request contains information about the TCP request.
+	Request *Request
+	// ResponseWriter writes the response on the connection.
+	ResponseWriter
+	// Keys is a key/value pair allows data sharing inside the context of each request.
+	Shared M
+
 	errs     Errors
 	index    int
 	handlers []HandlerFunc
-	writer   *responseWriter
+	srv      *Server
+	writer   responseWriter
 }
 
-// Close implements the Conn interface.
-func (c *Context) Close() error {
-	if c.Request != nil {
-		c.Request.Cancel()
-	}
-	if c.conn == nil {
-		return nil
-	}
-	return c.conn.Close()
-}
-
-// Closed implements the Conn interface.
-func (c *Context) Closed() <-chan struct{} {
+// Canceled is a shortcut to listen the request's cancellation.
+func (c *Context) Canceled() <-chan struct{} {
 	if c.Request == nil {
 		return nil
 	}
-	return c.Request.Closed()
+	return c.Request.Canceled()
+}
+
+// Close immediately closes the connection.
+// An error is returned when we fail to do it.
+func (c *Context) Close() error {
+	return c.writer.Close()
 }
 
 // Error reports a new error.
@@ -43,9 +45,70 @@ func (c *Context) Error(err error) {
 }
 
 // Err explains what failed during the request.
-// The method name is inspired of the context package.
+// The method name is inspired by the context package.
 func (c *Context) Err() error {
 	return c.errs
+}
+
+// Get retrieves in shared memory the given key.ResponseWriter
+// It returns its value or not exists if it fails to found it..
+func (c *Context) Get(key string) (value interface{}, exists bool) {
+	value, exists = c.Shared[key]
+	return
+}
+
+// GetBool returns the value associated with the key as a boolean.
+func (c *Context) GetBool(key string) (value bool) {
+	v, ok := c.Get(key)
+	if ok {
+		value, _ = v.(bool)
+	}
+	return
+}
+
+// GetDuration returns the value associated with the key as a time duration.
+func (c *Context) GetDuration(key string) (value time.Duration) {
+	v, ok := c.Get(key)
+	if ok {
+		value, _ = v.(time.Duration)
+	}
+	return
+}
+
+// GetFloat64 returns the value associated with the key as a float64.
+func (c *Context) GetFloat64(key string) (value float64) {
+	v, ok := c.Get(key)
+	if ok {
+		value, _ = v.(float64)
+	}
+	return
+}
+
+// GetInt returns the value associated with the key as a int.
+func (c *Context) GetInt(key string) (value int) {
+	v, ok := c.Get(key)
+	if ok {
+		value, _ = v.(int)
+	}
+	return
+}
+
+// GetInt64 returns the value associated with the key as a int64.
+func (c *Context) GetInt64(key string) (value int64) {
+	v, ok := c.Get(key)
+	if ok {
+		value, _ = v.(int64)
+	}
+	return
+}
+
+// GetString returns the value associated with the key as a string.
+func (c *Context) GetString(key string) (value string) {
+	v, ok := c.Get(key)
+	if ok {
+		value, _ = v.(string)
+	}
+	return
 }
 
 // Next should be used only inside middleware.
@@ -58,13 +121,21 @@ func (c *Context) Next() {
 	}
 }
 
-// String writes the given string into the connection.
+// ReadAll return stream data.
+func (c *Context) ReadAll() ([]byte, error) {
+	if c.Request == nil {
+		return nil, ErrRequest
+	}
+	return ioutil.ReadAll(c.Request.Body)
+}
+
+// String writes the given string on the current connection.
 func (c *Context) String(s string) {
 	if !strings.HasSuffix(s, "\n") {
 		// sends it now
 		s += "\n"
 	}
-	_, err := c.ResponseWriter.WriteString(s)
+	_, err := c.writer.WriteString(s)
 	if err != nil {
 		c.Error(err)
 	}
@@ -72,47 +143,12 @@ func (c *Context) String(s string) {
 
 // Write implements the Conn interface.
 func (c *Context) Write(d []byte) (int, error) {
-	return c.ResponseWriter.Write(d)
-}
-
-func (c *Context) catch() {
-	// Launches any handler waiting for new connection.
-	c.applyHandlers(SYN)
-	r := bufio.NewReader(c.conn)
-	for {
-		x := c.copy()
-		d, err := r.ReadBytes('\n')
-		if err != nil {
-			x.close()
-			return
-		}
-		go x.handle(d)
-	}
-}
-
-func (c *Context) close() {
-	// launches any handler waiting for closed connection.
-	c.applyHandlers(FIN)
-	// tries to close the connection and the context
-	if err := c.Close(); err != nil {
-		c.Error(NewError("close", err))
-	}
-}
-
-func (c *Context) copy() *Context {
-	var cc = *c
-	cc.handlers = nil
-	return &cc
-}
-
-func (c *Context) handle(d []byte) {
-	// use response as entry point
-	// launches any handler waiting for new message.
-	c.applyHandlers(ACK)
+	return c.writer.Write(d)
 }
 
 func (c *Context) reset() {
-	c.ResponseWriter = c.writer
+	c.ResponseWriter = &c.writer
+	c.Shared = make(M)
 	c.handlers = nil
 	c.index = -1
 	c.errs = c.errs[0:0]

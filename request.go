@@ -8,12 +8,10 @@ import (
 
 // Request represents an TCP request.
 type Request struct {
-	// Method specifies the TCP step (SYN, ACK, FIN).
-	Method string
-
+	// Segment specifies the TCP segment (SYN, ACK, FIN).
+	Segment string
 	// Body is the request's body.
 	Body io.ReadCloser
-
 	// RemoteAddr returns the remote network address.
 	RemoteAddr string
 
@@ -21,15 +19,15 @@ type Request struct {
 	cancel context.CancelFunc
 }
 
-// Close implements the io.Closer interface.
+// Cancel closes the request.
 func (r *Request) Cancel() {
 	if r.cancel != nil {
 		r.cancel()
 	}
 }
 
-// Closed implements the Conn interface.
-func (r *Request) Closed() <-chan struct{} {
+// Canceled listens the context of the request until its closing..
+func (r *Request) Canceled() <-chan struct{} {
 	return r.Context().Done()
 }
 
@@ -53,18 +51,21 @@ func (r *Request) WithCancel(ctx context.Context) *Request {
 	return r2
 }
 
-// NewRequest ...
-func NewRequest(method string, body io.Reader) (*Request, error) {
-	if method == "" {
-		return nil, ErrRequest
+// NewRequest returns a new instance of request.
+// A segment is mandatory as input, an error is returned if it missing.
+// If the body is missing, a no-op reader with closing is used.
+func NewRequest(segment string, body io.Reader) *Request {
+	if segment == "" {
+		// by default, we use the SYN segment.
+		segment = SYN
 	}
 	rc, ok := body.(io.ReadCloser)
 	if !ok && body != nil {
 		rc = ioutil.NopCloser(body)
 	}
 	req := &Request{
-		Method: method,
-		Body:   rc,
+		Segment: segment,
+		Body:    rc,
 	}
-	return req, nil
+	return req
 }

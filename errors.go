@@ -4,10 +4,10 @@ import (
 	"strings"
 )
 
-// ErrRequest ...
+// ErrRequest is returned if the request is invalid.
 var ErrRequest = NewError("invalid request")
 
-// NewError ...
+// NewError returns a new Error based of the given cause.
 func NewError(msg string, cause ...error) error {
 	if cause == nil {
 		return &Error{msg: msg}
@@ -15,7 +15,8 @@ func NewError(msg string, cause ...error) error {
 	return &Error{msg: msg, cause: cause[0]}
 }
 
-// Error ...
+// Error represents a error message.
+// It can wraps another error, its cause.
 type Error struct {
 	msg   string
 	cause error
@@ -29,7 +30,7 @@ func (e *Error) Error() string {
 	return "tcp: " + e.msg + ": " + e.cause.Error()
 }
 
-// Errors ...
+// Errors contains the list of errors occurred during the request.
 type Errors []error
 
 // Error implements the error interface.
