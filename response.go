@@ -7,11 +7,14 @@ import (
 // ResponseWriter interface is used by a TCP handler to write the response.
 type ResponseWriter interface {
 	io.WriteCloser
+	// Size returns the number of bytes already written into the response body.
+	// -1: not already written
+	Size() int
 }
 
 type responseWriter struct {
-	ResponseWriter
-	size int
+	ResponseWriter io.WriteCloser
+	size           int
 }
 
 const noWritten = -1
@@ -21,8 +24,7 @@ func (r *responseWriter) Close() error {
 	return r.ResponseWriter.Close()
 }
 
-// Size returns the number of bytes already written into the response body.
-// -1: not already written
+// Size implements the ResponseWriter interface.
 func (r *responseWriter) Size() int {
 	return r.size
 }

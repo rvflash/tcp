@@ -1,6 +1,7 @@
 package tcp
 
 import (
+	"io"
 	"io/ioutil"
 	"strings"
 	"time"
@@ -11,7 +12,7 @@ type M map[string]interface{}
 
 // Context allows us to pass variables between middleware and manage the flow.
 type Context struct {
-	//Request contains information about the TCP request.
+	// Request contains information about the TCP request.
 	Request *Request
 	// ResponseWriter writes the response on the connection.
 	ResponseWriter
@@ -46,7 +47,7 @@ func (c *Context) Error(err error) {
 
 // Err explains what failed during the request.
 // The method name is inspired by the context package.
-func (c *Context) Err() error {
+func (c *Context) Err() Errors {
 	return c.errs
 }
 
@@ -126,6 +127,9 @@ func (c *Context) ReadAll() ([]byte, error) {
 	if c.Request == nil {
 		return nil, ErrRequest
 	}
+	if c.Request.Body == nil {
+		return nil, io.EOF
+	}
 	return ioutil.ReadAll(c.Request.Body)
 }
 
@@ -151,5 +155,5 @@ func (c *Context) reset() {
 	c.Shared = make(M)
 	c.handlers = nil
 	c.index = -1
-	c.errs = c.errs[0:0]
+	c.errs = nil
 }

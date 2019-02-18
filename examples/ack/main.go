@@ -12,19 +12,15 @@ func main() {
 		// new message received
 		body, err := c.ReadAll()
 		if err != nil {
-			log.Println("err:", err)
+			c.Error(err)
 		}
-		log.Println("request:", body)
-		log.Println("say hi!")
-		c.String("hi!")
+		c.String(string(body))
 	})
 	r.SYN(func(c *tcp.Context) {
-		log.Println("say hello!")
 		c.String("hello")
 	})
 	r.FIN(func(c *tcp.Context) {
-		log.Println("remote addr")
-		log.Println(c.Request.RemoteAddr)
+		log.Println("bye")
 	})
 	log.Fatal(r.Run(":9090"))
 }

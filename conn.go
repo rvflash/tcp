@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"io/ioutil"
 	"net"
 )
 
@@ -27,7 +26,7 @@ func (c *conn) ServeTCP(w ResponseWriter, req *Request) {
 }
 
 func (c *conn) bySegment(segment string, body io.Reader) {
-	req := c.newRequest(segment, ioutil.NopCloser(body))
+	req := c.newRequest(segment, body)
 	w := c.newResponseWriter()
 	c.ServeTCP(w, req)
 }

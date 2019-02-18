@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 )
 
-// Request represents an TCP request.
+// req represents an TCP request.
 type Request struct {
 	// Segment specifies the TCP segment (SYN, ACK, FIN).
 	Segment string
@@ -52,20 +52,20 @@ func (r *Request) WithCancel(ctx context.Context) *Request {
 }
 
 // NewRequest returns a new instance of request.
-// A segment is mandatory as input, an error is returned if it missing.
+// A segment is mandatory as input. If empty, a SYN segment is used.
 // If the body is missing, a no-op reader with closing is used.
 func NewRequest(segment string, body io.Reader) *Request {
 	if segment == "" {
 		// by default, we use the SYN segment.
 		segment = SYN
 	}
-	rc, ok := body.(io.ReadCloser)
-	if !ok && body != nil {
-		rc = ioutil.NopCloser(body)
-	}
-	req := &Request{
-		Segment: segment,
-		Body:    rc,
+	req := &Request{Segment: segment}
+	if body != nil {
+		rc, ok := body.(io.ReadCloser)
+		if !ok {
+			rc = ioutil.NopCloser(body)
+		}
+		req.Body = rc
 	}
 	return req
 }

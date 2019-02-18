@@ -6,6 +6,8 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 // Handler responds to a TCP request.
@@ -40,8 +42,19 @@ const (
 
 // Default returns an instance of TCP server with a Logger and a Recover on panic attached.
 func Default() *Server {
-	// todo :)
-	return New()
+	// Adds a logger.
+	l := logrus.New()
+	l.Formatter = &logrus.TextFormatter{DisableTimestamp: true}
+	f := logrus.Fields{
+		Latency:        0,
+		Hostname:       "",
+		RemoteAddr:     "",
+		RequestLength:  0,
+		ResponseLength: 0,
+	}
+	h := New()
+	h.Use(Logger(l, f))
+	return h
 }
 
 // New returns a new instance of a TCP server.
