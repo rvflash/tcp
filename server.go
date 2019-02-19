@@ -42,7 +42,6 @@ const (
 
 // Default returns an instance of TCP server with a Logger and a Recover on panic attached.
 func Default() *Server {
-	// Adds a logger.
 	l := logrus.New()
 	l.Formatter = &logrus.TextFormatter{DisableTimestamp: true}
 	f := logrus.Fields{
@@ -54,6 +53,7 @@ func Default() *Server {
 	}
 	h := New()
 	h.Use(Logger(l, f))
+	h.Use(Recovery())
 	return h
 }
 
@@ -76,17 +76,6 @@ type Server struct {
 
 	handlers map[string][]HandlerFunc
 	pool     sync.Pool
-}
-
-func (s *Server) allocateContext() *Context {
-	return &Context{srv: s}
-}
-
-func (s *Server) computeHandlers(segment string) []HandlerFunc {
-	m := make([]HandlerFunc, len(s.handlers[ANY])+len(s.handlers[segment]))
-	copy(m, s.handlers[ANY])
-	copy(m[len(s.handlers[ANY]):], s.handlers[segment])
-	return m
 }
 
 // Any attaches handlers on the given segment.
@@ -150,6 +139,34 @@ func (s *Server) Run(addr string) (err error) {
 	}
 }
 
+func (s *Server) newConn(ctx context.Context, c net.Conn) *conn {
+	return &conn{
+		addr: c.RemoteAddr().String(),
+		ctx:  ctx,
+		srv:  s,
+		rwc:  c,
+	}
+}
+
+func (s *Server) allocateContext() *Context {
+	return &Context{srv: s}
+}
+
+func (s *Server) computeHandlers(segment string) []HandlerFunc {
+	m := make([]HandlerFunc, len(s.handlers[ANY])+len(s.handlers[segment]))
+	copy(m, s.handlers[ANY])
+	copy(m[len(s.handlers[ANY]):], s.handlers[segment])
+	return m
+}
+
+func (s *Server) get() *Context {
+	return s.pool.Get().(*Context)
+}
+
+func (s *Server) put(c *Context) {
+	s.pool.Put(c)
+}
+
 func newConn(l net.Listener, to time.Duration) (net.Conn, error) {
 	c, err := l.Accept()
 	if err != nil {
@@ -163,21 +180,4 @@ func newConn(l net.Listener, to time.Duration) (net.Conn, error) {
 		return nil, err
 	}
 	return c, nil
-}
-
-func (s *Server) newConn(ctx context.Context, c net.Conn) *conn {
-	return &conn{
-		addr: c.RemoteAddr().String(),
-		ctx:  ctx,
-		srv:  s,
-		rwc:  c,
-	}
-}
-
-func (s *Server) put(c *Context) {
-	s.pool.Put(c)
-}
-
-func (s *Server) get() *Context {
-	return s.pool.Get().(*Context)
 }

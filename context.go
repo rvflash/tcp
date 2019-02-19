@@ -26,6 +26,14 @@ type Context struct {
 	writer   responseWriter
 }
 
+const abortIndex = 63
+
+// Abort prevents pending handlers from being called,
+// but not interrupt the current handler.
+func (c *Context) Abort() {
+	c.index = abortIndex
+}
+
 // Canceled is a shortcut to listen the request's cancellation.
 func (c *Context) Canceled() <-chan struct{} {
 	if c.Request == nil {
@@ -149,6 +157,12 @@ func (c *Context) String(s string) {
 func (c *Context) Write(d []byte) (int, error) {
 	return c.writer.Write(d)
 }
+
+/*
+func (c *Context) isAborted() bool {
+	return c.index >= abortIndex
+}
+*/
 
 func (c *Context) reset() {
 	c.ResponseWriter = &c.writer

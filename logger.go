@@ -18,6 +18,25 @@ const (
 	Hostname       = "server"
 )
 
+// Logger returns a middleware to log each TCP request.
+func Logger(log *logrus.Logger, fields logrus.Fields) HandlerFunc {
+	return func(c *Context) {
+		// Initiates the timer
+		m := newMessage(c.Request)
+		// Processes the request
+		c.Next()
+		// Logs it.
+		entry := logrus.NewEntry(log).WithFields(m.fields(c.ResponseWriter, fields))
+		if e := c.Err(); e == nil {
+			entry.Info(m.String())
+		} else if e.Recovered() {
+			entry.Error(m.String() + " " + e.Error())
+		} else {
+			entry.Warn(m.String() + " " + e.Error())
+		}
+	}
+}
+
 func newMessage(req *Request) *message {
 	// starts the UTC timer.
 	m := &message{
@@ -64,23 +83,4 @@ func (m *message) fields(w ResponseWriter, f logrus.Fields) logrus.Fields {
 func (m *message) String() string {
 	sep := " | "
 	return "[TCP] " + m.start.Format(time.RFC3339) + sep + m.req.Segment
-}
-
-// Logger returns a middleware to log each TCP request.
-func Logger(log *logrus.Logger, fields logrus.Fields) HandlerFunc {
-	return func(c *Context) {
-		// Initiates the timer
-		m := newMessage(c.Request)
-		// Processes the request
-		c.Next()
-		// Logs it.
-		entry := logrus.NewEntry(log).WithFields(m.fields(c.ResponseWriter, fields))
-		if e := c.Err(); e == nil {
-			entry.Info(m.String())
-		} else if e.Recovered() {
-			entry.Error(m.String() + " " + e.Error())
-		} else {
-			entry.Warn(m.String() + " " + e.Error())
-		}
-	}
 }

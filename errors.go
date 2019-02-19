@@ -6,9 +6,9 @@ import (
 
 // Err represents a TCP error.
 type Err interface {
+	error
 	// Recovered returns true if the error comes from a panic recovering.
 	Recovered() bool
-	error
 }
 
 // ErrRequest is returned if the request is invalid.

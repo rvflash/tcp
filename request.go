@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 )
 
-// req represents an TCP request.
+// Request represents an TCP request.
 type Request struct {
 	// Segment specifies the TCP segment (SYN, ACK, FIN).
 	Segment string
@@ -14,7 +14,7 @@ type Request struct {
 	Body io.ReadCloser
 	// RemoteAddr returns the remote network address.
 	RemoteAddr string
-
+	// Context of the request.
 	ctx    context.Context
 	cancel context.CancelFunc
 }
@@ -26,7 +26,7 @@ func (r *Request) Cancel() {
 	}
 }
 
-// Canceled listens the context of the request until its closing..
+// Canceled listens the context of the request until its closing.
 func (r *Request) Canceled() <-chan struct{} {
 	return r.Context().Done()
 }

@@ -14,7 +14,8 @@ func main() {
 		if err != nil {
 			c.Error(err)
 		}
-		c.String(string(body))
+		log.Println(string(body))
+		c.String("read")
 	})
 	r.SYN(func(c *tcp.Context) {
 		c.String("hello")
