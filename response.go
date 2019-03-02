@@ -13,6 +13,13 @@ type ResponseWriter interface {
 	io.WriteCloser
 }
 
+func newWriter(wc io.WriteCloser) *responseWriter {
+	return &responseWriter{
+		ResponseWriter: wc,
+		size:           noWritten,
+	}
+}
+
 type responseWriter struct {
 	ResponseWriter io.WriteCloser
 	size           int

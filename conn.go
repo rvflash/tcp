@@ -16,16 +16,9 @@ type conn struct {
 }
 
 func (c *conn) bySegment(segment string, body io.Reader) {
-	w := c.newResponseWriter()
+	w := newWriter(c.rwc)
 	req := c.newRequest(segment, body)
 	c.srv.ServeTCP(w, req)
-}
-
-func (c *conn) newResponseWriter() *responseWriter {
-	return &responseWriter{
-		ResponseWriter: c.rwc,
-		size:           noWritten,
-	}
 }
 
 func (c *conn) newRequest(segment string, body io.Reader) *Request {
