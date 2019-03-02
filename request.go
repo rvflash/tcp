@@ -12,8 +12,9 @@ type Request struct {
 	Segment string
 	// Body is the request's body.
 	Body io.ReadCloser
-	// RemoteAddr returns the remote network address.
+	// remoteAddr returns the remote network address.
 	RemoteAddr string
+
 	// Context of the request.
 	ctx    context.Context
 	cancel context.CancelFunc

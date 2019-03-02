@@ -42,15 +42,15 @@ const (
 
 // Default returns an instance of TCP server with a Logger and a Recover on panic attached.
 func Default() *Server {
+	f := logrus.Fields{
+		latency:    0,
+		hostname:   "",
+		remoteAddr: "",
+		reqLength:  0,
+		respLength: 0,
+	}
 	l := logrus.New()
 	l.Formatter = &logrus.TextFormatter{DisableTimestamp: true}
-	f := logrus.Fields{
-		Latency:        0,
-		Hostname:       "",
-		RemoteAddr:     "",
-		RequestLength:  0,
-		ResponseLength: 0,
-	}
 	h := New()
 	h.Use(Logger(l, f))
 	h.Use(Recovery())
@@ -66,6 +66,10 @@ func New() *Server {
 		return s.allocateContext()
 	}
 	return s
+}
+
+func (s *Server) allocateContext() *Context {
+	return &Context{srv: s}
 }
 
 // Server is the TCP server. It contains
@@ -130,7 +134,7 @@ func (s *Server) Run(addr string) (err error) {
 	}()
 	ctx := context.Background()
 	for {
-		c, err := newConn(l, s.ReadTimeout)
+		c, err := read(l, s.ReadTimeout)
 		if err != nil {
 			return err
 		}
@@ -148,8 +152,22 @@ func (s *Server) newConn(ctx context.Context, c net.Conn) *conn {
 	}
 }
 
-func (s *Server) allocateContext() *Context {
-	return &Context{srv: s}
+// ServeTCP implements the Handler interface;
+func (s *Server) ServeTCP(w ResponseWriter, req *Request) {
+	ctx := s.pool.Get().(*Context)
+	ctx.writer.rebase(w)
+	ctx.Request = req
+	ctx.reset()
+	s.handle(ctx)
+	s.pool.Put(ctx)
+}
+
+func (s *Server) handle(ctx *Context) {
+	ctx.handlers = s.computeHandlers(ctx.Request.Segment)
+	if len(ctx.handlers) == 0 {
+		return
+	}
+	ctx.Next()
 }
 
 func (s *Server) computeHandlers(segment string) []HandlerFunc {
@@ -159,15 +177,7 @@ func (s *Server) computeHandlers(segment string) []HandlerFunc {
 	return m
 }
 
-func (s *Server) get() *Context {
-	return s.pool.Get().(*Context)
-}
-
-func (s *Server) put(c *Context) {
-	s.pool.Put(c)
-}
-
-func newConn(l net.Listener, to time.Duration) (net.Conn, error) {
+func read(l net.Listener, to time.Duration) (net.Conn, error) {
 	c, err := l.Accept()
 	if err != nil {
 		return nil, err

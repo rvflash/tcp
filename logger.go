@@ -11,11 +11,11 @@ import (
 )
 
 const (
-	RemoteAddr     = "addr"
-	RequestLength  = "req_size"
-	ResponseLength = "resp_size"
-	Latency        = "latency"
-	Hostname       = "server"
+	remoteAddr = "addr"
+	reqLength  = "req_size"
+	respLength = "resp_size"
+	latency    = "latency"
+	hostname   = "server"
 )
 
 // Logger returns a middleware to log each TCP request.
@@ -30,9 +30,9 @@ func Logger(log *logrus.Logger, fields logrus.Fields) HandlerFunc {
 		if e := c.Err(); e == nil {
 			entry.Info(m.String())
 		} else if e.Recovered() {
-			entry.Error(m.String() + " " + e.Error())
+			entry.Errorf("%s %s", m, e)
 		} else {
-			entry.Warn(m.String() + " " + e.Error())
+			entry.Warnf("%s %s", m, e)
 		}
 	}
 }
@@ -63,16 +63,16 @@ func (m *message) fields(w ResponseWriter, f logrus.Fields) logrus.Fields {
 	d := make(logrus.Fields)
 	for k := range f {
 		switch k {
-		case RemoteAddr:
+		case remoteAddr:
 			d[k] = m.req.RemoteAddr
-		case RequestLength:
+		case reqLength:
 			d[k] = w.Size()
-		case ResponseLength:
+		case respLength:
 			d[k] = m.reqSize
-		case Latency:
+		case latency:
 			m.latency = time.Since(m.start)
 			d[k] = int(math.Ceil(float64(m.latency.Nanoseconds()) / 1000.0))
-		case Hostname:
+		case hostname:
 			d[k], _ = os.Hostname()
 		}
 	}
@@ -81,6 +81,5 @@ func (m *message) fields(w ResponseWriter, f logrus.Fields) logrus.Fields {
 
 // String implements the fmt.Stringer interface.
 func (m *message) String() string {
-	sep := " | "
-	return "[TCP] " + m.start.Format(time.RFC3339) + sep + m.req.Segment
+	return "[TCP] " + m.start.Format(time.RFC3339) + " | " + m.req.Segment
 }

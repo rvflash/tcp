@@ -130,7 +130,7 @@ func (c *Context) Next() {
 	}
 }
 
-// ReadAll return stream data.
+// ReadAll return the stream data.
 func (c *Context) ReadAll() ([]byte, error) {
 	if c.Request == nil {
 		return nil, ErrRequest
@@ -143,9 +143,10 @@ func (c *Context) ReadAll() ([]byte, error) {
 
 // String writes the given string on the current connection.
 func (c *Context) String(s string) {
-	if !strings.HasSuffix(s, "\n") {
-		// sends it now
-		s += "\n"
+	const eom = "\n"
+	if !strings.HasSuffix(s, eom) {
+		// sends it now, ending the message.
+		s += eom
 	}
 	_, err := c.writer.WriteString(s)
 	if err != nil {

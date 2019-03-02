@@ -15,28 +15,10 @@ type conn struct {
 	rwc  net.Conn
 }
 
-// ServeTCP implements the Handler interface.
-func (c *conn) ServeTCP(w ResponseWriter, req *Request) {
-	ctx := c.srv.get()
-	ctx.writer.rebase(w)
-	ctx.Request = req
-	ctx.reset()
-	c.handle(ctx)
-	c.srv.put(ctx)
-}
-
 func (c *conn) bySegment(segment string, body io.Reader) {
-	req := c.newRequest(segment, body)
 	w := c.newResponseWriter()
-	c.ServeTCP(w, req)
-}
-
-func (c *conn) handle(ctx *Context) {
-	ctx.handlers = c.srv.computeHandlers(ctx.Request.Segment)
-	if len(ctx.handlers) == 0 {
-		return
-	}
-	ctx.Next()
+	req := c.newRequest(segment, body)
+	c.srv.ServeTCP(w, req)
 }
 
 func (c *conn) newResponseWriter() *responseWriter {

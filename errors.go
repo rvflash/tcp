@@ -15,7 +15,7 @@ type Err interface {
 var ErrRequest = NewError("invalid request")
 
 // NewError returns a new Error based of the given cause.
-func NewError(msg string, cause ...error) error {
+func NewError(msg string, cause ...error) *Error {
 	if cause == nil {
 		return &Error{msg: msg}
 	}
@@ -32,10 +32,11 @@ type Error struct {
 
 // Error implements the Err interface.
 func (e *Error) Error() string {
+	const prefix = "tcp: "
 	if e.cause == nil {
-		return "tcp: " + e.msg
+		return prefix + e.msg
 	}
-	return "tcp: " + e.msg + ": " + e.cause.Error()
+	return prefix + e.msg + ": " + e.cause.Error()
 }
 
 // Recovered implements the Err interface.
@@ -67,9 +68,10 @@ func (e Errors) Error() string {
 
 // Recovered implements the Err interface.
 func (e Errors) Recovered() (ok bool) {
+	var err Err
 	for _, r := range e {
-		_, ok = r.(*Error)
-		if ok {
+		err, ok = r.(Err)
+		if ok && err.Recovered() {
 			return
 		}
 	}
