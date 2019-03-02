@@ -7,9 +7,32 @@ import (
 )
 
 func TestRecovery(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Error("expected no panic")
+		}
+	}()
 	srv := tcp.New()
 	srv.Use(tcp.Recovery())
-	req := tcp.NewRequest(tcp.SYN, nil)
+	srv.SYN(oops)
+
 	w := tcp.NewRecorder()
-	srv.ServeTCP(w, req)
+	srv.ServeTCP(w, tcp.NewRequest(tcp.SYN, nil))
+}
+
+func TestRecovery2(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic")
+		}
+	}()
+	srv := tcp.New()
+	srv.SYN(oops)
+
+	w := tcp.NewRecorder()
+	srv.ServeTCP(w, tcp.NewRequest(tcp.SYN, nil))
+}
+
+func oops(c *tcp.Context) {
+	panic("oops, sorry!")
 }
