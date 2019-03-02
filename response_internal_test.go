@@ -22,6 +22,7 @@ func TestResponseWriter_Write(t *testing.T) {
 		n   int
 		err error
 	)
+	are.Equal(w.Size(), noWritten)
 	for _, tt := range dt {
 		t.Run(tt.msg, func(t *testing.T) {
 			n, err = w.Write([]byte(tt.msg))
@@ -49,6 +50,7 @@ func TestResponseWriter_WriteString(t *testing.T) {
 		n   int
 		err error
 	)
+	are.Equal(w.Size(), noWritten)
 	for _, tt := range dt {
 		t.Run(tt.msg, func(t *testing.T) {
 			n, err = w.WriteString(tt.msg)
