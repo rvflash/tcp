@@ -54,7 +54,6 @@ func (r *Request) WithCancel(ctx context.Context) *Request {
 
 // NewRequest returns a new instance of request.
 // A segment is mandatory as input. If empty, a SYN segment is used.
-// If the body is missing, a no-op reader with closing is used.
 func NewRequest(segment string, body io.Reader) *Request {
 	if segment == "" {
 		// by default, we use the SYN segment.
