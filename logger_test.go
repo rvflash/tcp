@@ -117,5 +117,5 @@ func sleep(_ *tcp.Context) {
 }
 
 func stumble(c *tcp.Context) {
-	c.Error(errors.New("my bad, sorry!"))
+	c.Error(errors.New("my bad, sorry"))
 }

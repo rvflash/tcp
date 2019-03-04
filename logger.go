@@ -32,12 +32,14 @@ func Logger(log *logrus.Logger, fields logrus.Fields) HandlerFunc {
 		c.Next()
 		// Logs it.
 		entry := logrus.NewEntry(log).WithFields(m.fields(c.ResponseWriter, fields))
-		if e := c.Err(); e == nil {
+		err := c.Err()
+		switch {
+		case err == nil:
 			entry.Info(m.String())
-		} else if e.Recovered() {
-			entry.Errorf("%s %s", m, e)
-		} else {
-			entry.Warnf("%s %s", m, e)
+		case err.Recovered():
+			entry.Errorf("%s %s", m, err)
+		default:
+			entry.Warnf("%s %s", m, err)
 		}
 	}
 }
