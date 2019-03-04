@@ -43,11 +43,11 @@ const (
 // Default returns an instance of TCP server with a Logger and a Recover on panic attached.
 func Default() *Server {
 	f := logrus.Fields{
-		latency:    0,
-		hostname:   "",
-		remoteAddr: "",
-		reqLength:  0,
-		respLength: 0,
+		LogLatency:        0,
+		LogServerHostname: "",
+		LogRemoteAddr:     "",
+		LogRequestSize:    0,
+		LogResponseSize:   0,
 	}
 	l := logrus.New()
 	l.Formatter = &logrus.TextFormatter{DisableTimestamp: true}

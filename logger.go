@@ -11,11 +11,16 @@ import (
 )
 
 const (
-	remoteAddr = "addr"
-	reqLength  = "req_size"
-	respLength = "resp_size"
-	latency    = "latency"
-	hostname   = "server"
+	// LogRemoteAddr is the name of the log's field for the remote address.
+	LogRemoteAddr = "addr"
+	// LogRequestSize is the name of the log's field for the request size.
+	LogRequestSize = "req_size"
+	// LogResponseSize is the name of the log's field for the response size.
+	LogResponseSize = "resp_size"
+	// LogLatency is the name of the log's field with the response duration.
+	LogLatency = "latency"
+	// LogServerHostname is the name of the log's field with the server hostname.
+	LogServerHostname = "server"
 )
 
 // Logger returns a middleware to log each TCP request.
@@ -61,19 +66,22 @@ type message struct {
 
 func (m *message) fields(w ResponseWriter, f logrus.Fields) logrus.Fields {
 	d := make(logrus.Fields)
-	for k := range f {
+	for k, v := range f {
 		switch k {
-		case remoteAddr:
+		case LogRemoteAddr:
 			d[k] = m.req.RemoteAddr
-		case reqLength:
-			d[k] = w.Size()
-		case respLength:
+		case LogRequestSize:
 			d[k] = m.reqSize
-		case latency:
+		case LogResponseSize:
+			d[k] = w.Size()
+		case LogLatency:
 			m.latency = time.Since(m.start)
-			d[k] = int(math.Ceil(float64(m.latency.Nanoseconds()) / 1000.0))
-		case hostname:
+			d[k] = int(math.Ceil(float64(m.latency.Nanoseconds()) / float64(time.Millisecond)))
+		case LogServerHostname:
 			d[k], _ = os.Hostname()
+		default:
+			// allows to logs statics data
+			d[k] = v
 		}
 	}
 	return d
@@ -81,5 +89,9 @@ func (m *message) fields(w ResponseWriter, f logrus.Fields) logrus.Fields {
 
 // String implements the fmt.Stringer interface.
 func (m *message) String() string {
+	if m.req == nil {
+		// unexpected segment
+		return ""
+	}
 	return "[TCP] " + m.start.Format(time.RFC3339) + " | " + m.req.Segment
 }
