@@ -58,7 +58,7 @@ func (r *responseWriter) incr(n int) {
 	r.size += n
 }
 
-func (r *responseWriter) rebase(w ResponseWriter) {
+func (r *responseWriter) rebase(w io.WriteCloser) {
 	r.ResponseWriter = w
 	r.size = noWritten
 }
