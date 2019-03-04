@@ -1,11 +1,19 @@
 package tcp_test
 
-import "testing"
+import (
+	"testing"
 
-func TestNew(t *testing.T) {
+	"github.com/rvflash/tcp"
+)
 
+func ExampleNew() {
+	srv := tcp.New()
+	srv.SYN(sleep)
+	// now runs it!
 }
 
 func TestDefault(t *testing.T) {
-
+	srv := tcp.Default()
+	srv.ACK(stumble)
+	// now runs it!
 }
