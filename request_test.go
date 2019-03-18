@@ -32,6 +32,7 @@ func TestNewRequest(t *testing.T) {
 		err error
 	)
 	for i, tt := range dt {
+		tt := tt
 		t.Run("#"+strconv.Itoa(i), func(t *testing.T) {
 			req = tcp.NewRequest(tt.seg, tt.body)
 			are.Equal(req.Segment, tt.segment)

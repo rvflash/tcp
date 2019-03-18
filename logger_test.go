@@ -16,27 +16,28 @@ import (
 	"github.com/rvflash/tcp"
 )
 
-var (
-	defaultFields = logrus.Fields{
-		tcp.LogLatency:        0,
-		tcp.LogServerHostname: "",
-		tcp.LogRemoteAddr:     "",
-		tcp.LogRequestSize:    0,
-		tcp.LogResponseSize:   0,
-	}
-	customFields = logrus.Fields{
-		tcp.LogLatency:     0,
-		tcp.LogRequestSize: 0,
-		vField:             vValue,
-	}
-	vField = "version"
-	vValue = "v0.0.0"
-)
-
 func TestLogger(t *testing.T) {
 	var (
 		are = is.New(t)
-		dt  = []struct {
+
+		// default values
+		vField        = "version"
+		vValue        = "v0.0.0"
+		defaultFields = logrus.Fields{
+			tcp.LogLatency:        0,
+			tcp.LogServerHostname: "",
+			tcp.LogRemoteAddr:     "",
+			tcp.LogRequestSize:    0,
+			tcp.LogResponseSize:   0,
+		}
+		customFields = logrus.Fields{
+			tcp.LogLatency:     0,
+			tcp.LogRequestSize: 0,
+			vField:             vValue,
+		}
+
+		// test cases
+		dt = []struct {
 			body io.Reader
 			bodySize,
 			dataSize int
@@ -89,6 +90,7 @@ func TestLogger(t *testing.T) {
 	log.Formatter = &logrus.TextFormatter{DisableTimestamp: true}
 
 	for i, tt := range dt {
+		tt := tt
 		t.Run("#"+strconv.Itoa(i), func(t *testing.T) {
 			// launches the server
 			srv := tcp.New()
@@ -119,3 +121,4 @@ func sleep(_ *tcp.Context) {
 func stumble(c *tcp.Context) {
 	c.Error(errors.New("my bad, sorry"))
 }
+g
