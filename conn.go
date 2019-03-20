@@ -16,15 +16,18 @@ type conn struct {
 }
 
 func (c *conn) bySegment(segment string, body io.Reader) {
+	ctx, cancel := context.WithCancel(c.ctx)
+	defer cancel()
+
 	w := newWriter(c.rwc)
-	req := c.newRequest(segment, body)
+	req := c.newRequest(segment, body).WithContext(ctx)
 	c.srv.ServeTCP(w, req)
 }
 
 func (c *conn) newRequest(segment string, body io.Reader) *Request {
 	req := NewRequest(segment, body)
 	req.RemoteAddr = c.addr
-	return req.WithCancel(c.ctx)
+	return req
 }
 
 func (c *conn) serve() {

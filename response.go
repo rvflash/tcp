@@ -29,6 +29,9 @@ const noWritten = -1
 
 // Close implements the ResponseWriter interface.
 func (r *responseWriter) Close() error {
+	if r.ResponseWriter == nil {
+		return nil
+	}
 	return r.ResponseWriter.Close()
 }
 
@@ -39,6 +42,9 @@ func (r *responseWriter) Size() int {
 
 // Write implements the ResponseWriter interface.
 func (r *responseWriter) Write(p []byte) (n int, err error) {
+	if r.ResponseWriter == nil {
+		return 0, io.EOF
+	}
 	n, err = r.ResponseWriter.Write(p)
 	r.incr(n)
 	return
@@ -46,6 +52,9 @@ func (r *responseWriter) Write(p []byte) (n int, err error) {
 
 // WriteString allows to directly write string.
 func (r *responseWriter) WriteString(s string) (n int, err error) {
+	if r.ResponseWriter == nil {
+		return 0, io.EOF
+	}
 	n, err = io.WriteString(r.ResponseWriter, s)
 	r.incr(n)
 	return
@@ -83,7 +92,7 @@ func (r *ResponseRecorder) Close() error {
 
 // Size implements the ResponseWriter interface.
 func (r *ResponseRecorder) Size() int {
-	if r.Body == nil {
+	if r == nil || r.Body == nil {
 		return noWritten
 	}
 	return r.Body.Len()
@@ -91,7 +100,7 @@ func (r *ResponseRecorder) Size() int {
 
 // Write implements the ResponseWriter interface.
 func (r *ResponseRecorder) Write(p []byte) (n int, err error) {
-	if r.Body == nil {
+	if r == nil || r.Body == nil {
 		return 0, io.EOF
 	}
 	n, err = r.Body.Write(p)
@@ -100,7 +109,7 @@ func (r *ResponseRecorder) Write(p []byte) (n int, err error) {
 
 // WriteString allows to directly write string.
 func (r *ResponseRecorder) WriteString(s string) (n int, err error) {
-	if r.Body == nil {
+	if r == nil || r.Body == nil {
 		return 0, io.EOF
 	}
 	n, err = r.Body.WriteString(s)
