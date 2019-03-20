@@ -29,6 +29,7 @@ func TestNewError(t *testing.T) {
 		err error
 	)
 	for i, tt := range dt {
+		tt := tt
 		t.Run("#"+strconv.Itoa(i), func(t *testing.T) {
 			err = tcp.NewError(tt.in, tt.err)
 			are.Equal(err.Error(), tt.out)
@@ -61,6 +62,7 @@ func TestErrors_Recovered(t *testing.T) {
 		are = is.New(t)
 	)
 	for i, tt := range dt {
+		tt := tt
 		t.Run("#"+strconv.Itoa(i), func(t *testing.T) {
 			are.Equal(tt.err.Recovered(), tt.ok)
 		})

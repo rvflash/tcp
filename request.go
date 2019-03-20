@@ -14,17 +14,8 @@ type Request struct {
 	Body io.ReadCloser
 	// LogRemoteAddr returns the remote network address.
 	RemoteAddr string
-
 	// Context of the request.
-	ctx    context.Context
-	cancel context.CancelFunc
-}
-
-// Cancel closes the request.
-func (r *Request) Cancel() {
-	if r.cancel != nil {
-		r.cancel()
-	}
+	ctx context.Context
 }
 
 // Canceled listens the context of the request until its closing.
@@ -40,15 +31,15 @@ func (r *Request) Context() context.Context {
 	return context.Background()
 }
 
-// WithCancel returns a shallow copy of the given request with its context changed to ctx.
-func (r *Request) WithCancel(ctx context.Context) *Request {
+// WithContext returns a shallow copy of the given request with its context changed to ctx.
+func (r *Request) WithContext(ctx context.Context) *Request {
 	if ctx == nil {
 		// awkward: nothing to do
 		return r
 	}
 	r2 := new(Request)
 	*r2 = *r
-	r2.ctx, r2.cancel = context.WithCancel(ctx)
+	r2.ctx = ctx
 	return r2
 }
 

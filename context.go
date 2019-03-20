@@ -59,10 +59,16 @@ func (c *Context) Err() Errors {
 	return c.errs
 }
 
-// Get retrieves in shared memory the given key.ResponseWriter
-// It returns its value or not exists if it fails to found it..
+// Get retrieves the value associated to the given key inside the embed shared memory.
+// If it's not exists, the request's context value is used as fail over.
 func (c *Context) Get(key string) (value interface{}, exists bool) {
 	value, exists = c.Shared[key]
+	if exists || c.Request == nil {
+		return
+	}
+	// fail over based on context values
+	value = c.Request.Context().Value(key)
+	exists = value != nil
 	return
 }
 
@@ -160,6 +166,7 @@ func (c *Context) Write(d []byte) (int, error) {
 }
 
 /*
+todo
 func (c *Context) isAborted() bool {
 	return c.index >= abortIndex
 }

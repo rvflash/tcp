@@ -26,7 +26,7 @@ func main() {
 			log.Fatalf("read stdin: %s", err)
 		}
 		// sends it
-		_, err := fmt.Fprintf(conn, s)
+		_, err := fmt.Fprint(conn, s)
 		if err != nil {
 			log.Fatalf("write conn: %s", err)
 		}
