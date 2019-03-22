@@ -13,6 +13,7 @@ func main() {
 		body, err := c.ReadAll()
 		if err != nil {
 			c.Error(err)
+			return
 		}
 		log.Println(string(body))
 		c.String("read")

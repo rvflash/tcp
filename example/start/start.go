@@ -15,6 +15,7 @@ func main() {
 		buf, err := c.ReadAll()
 		if err != nil {
 			c.Error(err)
+			return
 		}
 		// writes something as response
 		c.String(string(buf))
