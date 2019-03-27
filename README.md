@@ -29,6 +29,12 @@ import "github.com/rvflash/tcp"
 
 ## Features
 
+### TLS support
+
+By using the `RunTLS` method instead of `Run`, you can specify a certificate and
+a X509 key to create an TCP/TLS connection.
+
+
 ### Handler
 
 Just as Gin, a well done web framework whose provides functions based on HTTP methods,
