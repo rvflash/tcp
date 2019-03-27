@@ -1,6 +1,7 @@
 package tcp_test
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -92,14 +93,34 @@ func handleResp(segment string, expected bool) string {
 }
 
 const (
-	eol         = "\n"
-	clientAddr  = ":9123"
-	hiMsg       = "hi, there's someone?" + eol
-	receivedMsg = "received: %d bytes" + eol
-	welcomeMsg  = "welcome" + eol
+	eol           = "\n"
+	clientAddr    = ":9123"
+	clientTLSAddr = ":9443"
+	hiMsg         = "hi, there's someone?" + eol
+	receivedMsg   = "received: %d bytes" + eol
+	welcomeMsg    = "welcome" + eol
 )
 
 func TestServer_Run(t *testing.T) {
+	run(t, false)
+}
+
+func TestServer_RunTLS(t *testing.T) {
+	run(t, true)
+}
+
+func readConn(c io.Reader, size int) (out []byte, err error) {
+	out = make([]byte, size)
+	_, err = c.Read(out)
+	return
+}
+
+const (
+	certFile = "./testdata/server.pem"
+	keyFile  = "./testdata/server.key"
+)
+
+func run(t *testing.T, https bool) {
 	// Prepares the server
 	are := is.New(t)
 	srv := tcp.New()
@@ -107,13 +128,32 @@ func TestServer_Run(t *testing.T) {
 	srv.SYN(welcome)
 	srv.FIN(bye)
 	go func() {
-		err := srv.Run(clientAddr)
+		var err error
+		if https {
+			err = srv.RunTLS(clientTLSAddr, "./testdata/server.pem", "./testdata/server.key")
+		} else {
+			err = srv.Run(clientAddr)
+		}
 		are.NoErr(err)
 	}()
-	time.Sleep(time.Millisecond * 50)
+	time.Sleep(time.Millisecond * 100)
 
 	// Initiates the client
-	cli, err := net.Dial("tcp", clientAddr)
+	var (
+		cert tls.Certificate
+		cli  net.Conn
+		err  error
+	)
+	if https {
+		cert, err = tls.LoadX509KeyPair(certFile, keyFile)
+		are.NoErr(err)
+		cli, err = tls.Dial("tcp", clientTLSAddr, &tls.Config{
+			Certificates:       []tls.Certificate{cert},
+			InsecureSkipVerify: true,
+		})
+	} else {
+		cli, err = net.Dial("tcp", clientAddr)
+	}
 	are.NoErr(err)
 	defer func() {
 		are.NoErr(cli.Close())
@@ -129,12 +169,6 @@ func TestServer_Run(t *testing.T) {
 	out, err = readConn(cli, len(receivedMsg))
 	are.NoErr(err)
 	are.Equal(string(out), fmt.Sprintf(receivedMsg, len(hiMsg)))
-}
-
-func readConn(c io.Reader, size int) (out []byte, err error) {
-	out = make([]byte, size)
-	_, err = c.Read(out)
-	return
 }
 
 func writeConn(w io.Writer, data string) (err error) {

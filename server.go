@@ -3,6 +3,7 @@ package tcp
 
 import (
 	"context"
+	"crypto/tls"
 	"net"
 	"sync"
 	"time"
@@ -120,13 +121,33 @@ func (s *Server) Use(f ...HandlerFunc) Router {
 	return s
 }
 
+const network = "tcp"
+
 // Run starts listening on TCP address.
 // This method will block the calling goroutine indefinitely unless an error happens.
 func (s *Server) Run(addr string) (err error) {
-	l, err := net.Listen("tcp", addr)
+	l, err := net.Listen(network, addr)
 	if err != nil {
 		return
 	}
+	return s.serve(l)
+}
+
+// RunTLS acts identically to the Run method, except that it uses the TLS protocol.
+// This method will block the calling goroutine indefinitely unless an error happens.
+func (s *Server) RunTLS(addr, certFile, keyFile string) (err error) {
+	c, err := tlsConfig(certFile, keyFile)
+	if err != nil {
+		return
+	}
+	l, err := tls.Listen(network, addr, c)
+	if err != nil {
+		return
+	}
+	return s.serve(l)
+}
+
+func (s *Server) serve(l net.Listener) (err error) {
 	defer func() {
 		if err == nil {
 			err = l.Close()
@@ -175,6 +196,13 @@ func (s *Server) computeHandlers(segment string) []HandlerFunc {
 	copy(m, s.handlers[ANY])
 	copy(m[len(s.handlers[ANY]):], s.handlers[segment])
 	return m
+}
+
+func tlsConfig(certFile, keyFile string) (*tls.Config, error) {
+	var err error
+	c := make([]tls.Certificate, 1)
+	c[0], err = tls.LoadX509KeyPair(certFile, keyFile)
+	return &tls.Config{Certificates: c}, err
 }
 
 func read(l net.Listener, to time.Duration) (net.Conn, error) {
