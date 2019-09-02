@@ -251,7 +251,6 @@ func (s *Server) Shutdown(ctx context.Context) error {
 			return ctx.Err()
 		case <-s.closed:
 			return nil
-		default:
 		}
 	}
 }
