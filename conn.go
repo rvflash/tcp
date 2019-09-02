@@ -10,13 +10,12 @@ import (
 
 type conn struct {
 	addr string
-	ctx  context.Context
-	srv  *Server
 	rwc  net.Conn
+	srv  *Server
 }
 
-func (c *conn) bySegment(segment string, body io.Reader) {
-	ctx, cancel := context.WithCancel(c.ctx)
+func (c *conn) bySegment(ctx context.Context, segment string, body io.Reader) {
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	w := newWriter(c.rwc)
@@ -30,20 +29,28 @@ func (c *conn) newRequest(segment string, body io.Reader) *Request {
 	return req
 }
 
-func (c *conn) serve() {
-	// deals with a new connection
-	go c.bySegment(SYN, nil)
-	// waiting for messages
+func (c *conn) serve(ctx context.Context) {
+	// New connection
+	c.bySegment(ctx, SYN, nil)
+
+	// Waiting for messages
 	r := bufio.NewReader(c.rwc)
 	for {
+		select {
+		case <-ctx.Done():
+			// Connection closing, stops serving.
+			c.bySegment(ctx, FIN, r)
+			return
+		default:
+		}
 		d, err := r.ReadBytes('\n')
 		r := bytes.NewReader(d)
 		if err != nil {
-			// unable to read on it: closing the connection.
-			c.bySegment(FIN, r)
+			// Unable to read on it: closing the connection.
+			c.bySegment(ctx, FIN, r)
 			return
 		}
 		// new message received
-		go c.bySegment(ACK, r)
+		c.bySegment(ctx, ACK, r)
 	}
 }
