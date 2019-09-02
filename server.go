@@ -130,49 +130,41 @@ const network = "tcp"
 
 // Run starts listening on TCP address.
 // This method will block the calling goroutine indefinitely unless an error happens.
-func (s *Server) Run(addr string) (err error) {
+func (s *Server) Run(addr string) error {
 	l, err := net.Listen(network, addr)
 	if err != nil {
-		return
+		return err
 	}
-	defer func() {
-		cErr := l.Close()
-		if err != nil {
-			err = cErr
-		}
-	}()
-	err = s.serve(l)
-	return
+	return s.serve(l)
 }
 
 // RunTLS acts identically to the Run method, except that it uses the TLS protocol.
 // This method will block the calling goroutine indefinitely unless an error happens.
-func (s *Server) RunTLS(addr, certFile, keyFile string) (err error) {
+func (s *Server) RunTLS(addr, certFile, keyFile string) error {
 	c, err := tlsConfig(certFile, keyFile)
 	if err != nil {
-		return
+		return err
 	}
 	l, err := tls.Listen(network, addr, c)
 	if err != nil {
-		return
+		return err
 	}
-	defer func() {
-		cErr := l.Close()
-		if err != nil {
-			err = cErr
-		}
-	}()
-	err = s.serve(l)
-	return
+	return s.serve(l)
 }
 
-func (s *Server) serve(l net.Listener) error {
+func (s *Server) serve(l net.Listener) (err error) {
 	var (
 		w8  sync.WaitGroup
 		ctx context.Context
 	)
 	ctx, s.cancel = context.WithCancel(context.Background())
-	defer s.cancel()
+	defer func() {
+		s.cancel()
+		cErr := l.Close()
+		if err != nil {
+			err = cErr
+		}
+	}()
 	for {
 		select {
 		case <-s.shutdown:
@@ -180,12 +172,13 @@ func (s *Server) serve(l net.Listener) error {
 			// See the Shutdown method to gracefully shuts down the server.
 			w8.Wait()
 			close(s.closed)
-			return nil
+			return
 		default:
 		}
-		c, err := read(l, s.ReadTimeout)
+		var c net.Conn
+		c, err = read(l, s.ReadTimeout)
 		if err != nil {
-			return err
+			return
 		}
 		rwc := s.newConn(c)
 		w8.Add(1)
