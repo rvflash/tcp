@@ -11,8 +11,11 @@ type Err interface {
 	Recovered() bool
 }
 
-// ErrRequest is returned if the request is invalid.
-var ErrRequest = NewError("invalid request")
+// List of common errors
+var (
+	// ErrRequest is returned if the request is invalid.
+	ErrRequest = NewError("invalid request")
+)
 
 // NewError returns a new Error based of the given cause.
 func NewError(msg string, cause ...error) *Error {
