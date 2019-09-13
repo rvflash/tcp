@@ -31,25 +31,16 @@ func (c *conn) newRequest(segment string, body io.Reader) *Request {
 
 func (c *conn) serve(ctx context.Context) {
 	// New connection
-	c.bySegment(ctx, SYN, nil)
-	// Connection closed
-	defer c.bySegment(ctx, FIN, nil)
+	go c.bySegment(ctx, SYN, nil)
 	// Waiting for messages
 	r := bufio.NewReader(c.rwc)
 	for {
-		cb := make(chan []byte, 1)
-		go func() {
-			d, err := r.ReadBytes('\n')
-			if err != nil {
-				return
-			}
-			cb <- d
-		}()
-		select {
-		case <-ctx.Done():
-			return
-		case b := <-cb:
-			c.bySegment(ctx, ACK, bytes.NewReader(b))
+		d, err := r.ReadBytes('\n')
+		if err != nil {
+			break
 		}
+		go c.bySegment(ctx, ACK, bytes.NewReader(d))
 	}
+	// Connection closed
+	c.bySegment(ctx, FIN, nil)
 }
