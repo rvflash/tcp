@@ -68,6 +68,12 @@ The `Next` method on the `Context` should only be used inside middleware. Its al
 See the `Recovery` or `Logger` methods as sample code.
 
 
+### Graceful shutdown
+
+By running the TCP server is in own go routine, you can gracefully shuts down the server without interrupting any active connections.
+`Shutdown` works by first closing all open listeners and then waiting indefinitely for connections to return to idle and then shut down.
+
+
 ## Quick start
 
 Assuming the following code that runs a server on port 9090:
@@ -76,28 +82,44 @@ Assuming the following code that runs a server on port 9090:
 package main
 
 import (
-	"log"
+    "context"
+    "log"
+    "os"
+    "os/signal"
 
 	"github.com/rvflash/tcp"
 )
 
 func main() {
-	// creates a server with a logger and a recover on panic as middlewares.
+	bye := make(chan os.Signal, 1)
+	signal.Notify(bye, os.Interrupt, syscall.SIGTERM)
+
+	// Creates a server with a logger and a recover on panic as middlewares.
 	r := tcp.Default()
 	r.ACK(func(c *tcp.Context) {
-		// new message received
-		// gets the request body
+		// New message received
+		// Gets the request body
 		buf, err := c.ReadAll()
 		if err != nil {
 			c.Error(err)
 			return
 		}
-		// writes something as response
+		// Writes something as response
 		c.String(string(buf))
 	})
-	err := r.Run(":9090") // listen and serve on 0.0.0.0:9090
+	go func() {
+		err := r.Run(":9090")
+		if err != nil {
+			log.Printf("server: %q\n", err)
+		}
+	}()
+
+	<-bye
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	err := r.Shutdown(ctx)
+	cancel()
 	if err != nil {
-		log.Fatalf("listen: %s", err)
+		log.Fatal(err)
 	}
 }
 ```

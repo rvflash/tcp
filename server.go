@@ -62,6 +62,8 @@ func Default() *Server {
 func New() *Server {
 	s := &Server{
 		handlers: map[string][]HandlerFunc{},
+		closing:  make(chan struct{}),
+		closed:   make(chan struct{}),
 	}
 	s.pool.New = func() interface{} {
 		return s.allocateContext()
@@ -79,8 +81,14 @@ type Server struct {
 	// A zero value for t means Read will not time out.
 	ReadTimeout time.Duration
 
+	listener net.Listener
 	handlers map[string][]HandlerFunc
 	pool     sync.Pool
+
+	// graceful shutdown
+	cancelCtx context.CancelFunc
+	closed,
+	closing chan struct{}
 }
 
 // Any attaches handlers on the given segment.
@@ -126,48 +134,85 @@ const network = "tcp"
 // Run starts listening on TCP address.
 // This method will block the calling goroutine indefinitely unless an error happens.
 func (s *Server) Run(addr string) (err error) {
-	l, err := net.Listen(network, addr)
+	s.listener, err = net.Listen(network, addr)
 	if err != nil {
-		return
+		return err
 	}
-	return s.serve(l)
+	return s.serve()
 }
 
 // RunTLS acts identically to the Run method, except that it uses the TLS protocol.
 // This method will block the calling goroutine indefinitely unless an error happens.
-func (s *Server) RunTLS(addr, certFile, keyFile string) (err error) {
+func (s *Server) RunTLS(addr, certFile, keyFile string) error {
 	c, err := tlsConfig(certFile, keyFile)
 	if err != nil {
-		return
+		return err
 	}
-	l, err := tls.Listen(network, addr, c)
+	s.listener, err = tls.Listen(network, addr, c)
 	if err != nil {
-		return
+		return err
 	}
-	return s.serve(l)
+	return s.serve()
 }
 
-func (s *Server) serve(l net.Listener) (err error) {
+func (s *Server) close() {
+	select {
+	case <-s.closed:
+		// Already closed.
+		return
+	default:
+		close(s.closed)
+	}
+}
+
+func (s *Server) closeListener() error {
+	if s.cancelCtx == nil {
+		return nil
+	}
+	s.cancelCtx()
+	return s.listener.Close()
+}
+
+func (s *Server) serve() (err error) {
+	var (
+		w8  sync.WaitGroup
+		ctx context.Context
+	)
+	ctx, s.cancelCtx = context.WithCancel(context.Background())
 	defer func() {
-		if err == nil {
-			err = l.Close()
+		select {
+		case <-s.closed:
+		default:
+			err = s.closeListener()
+			return
 		}
 	}()
-	ctx := context.Background()
 	for {
-		c, err := read(l, s.ReadTimeout)
+		var c net.Conn
+		c, err = read(s.listener, s.ReadTimeout)
 		if err != nil {
-			return err
+			select {
+			case <-s.closing:
+				// Stops listening but does not interrupt any active connections.
+				w8.Wait()
+				s.close()
+				return nil
+			default:
+				return
+			}
 		}
-		rwc := s.newConn(ctx, c)
-		go rwc.serve()
+		rwc := s.newConn(c)
+		w8.Add(1)
+		go func() {
+			defer w8.Done()
+			rwc.serve(ctx)
+		}()
 	}
 }
 
-func (s *Server) newConn(ctx context.Context, c net.Conn) *conn {
+func (s *Server) newConn(c net.Conn) *conn {
 	return &conn{
 		addr: c.RemoteAddr().String(),
-		ctx:  ctx,
 		srv:  s,
 		rwc:  c,
 	}
@@ -198,6 +243,35 @@ func (s *Server) computeHandlers(segment string) []HandlerFunc {
 	return m
 }
 
+// Shutdown gracefully shuts down the server without interrupting any
+// active connections. Shutdown works by first closing all open listeners and
+// then waiting indefinitely for connections to return to idle and then shut down.
+// If the provided context expires before the closing is complete,
+// Shutdown returns the context's error.
+func (s *Server) Shutdown(ctx context.Context) error {
+	if s.closing == nil {
+		// Nothing to do
+		return nil
+	}
+	close(s.closing)
+
+	// Stops listening.
+	err := s.closeListener()
+	if err != nil {
+		return err
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			// Forces closing of all actives connections.
+			s.close()
+			return ctx.Err()
+		case <-s.closed:
+			return nil
+		}
+	}
+}
+
 func tlsConfig(certFile, keyFile string) (*tls.Config, error) {
 	var err error
 	c := make([]tls.Certificate, 1)
@@ -211,7 +285,7 @@ func read(l net.Listener, to time.Duration) (net.Conn, error) {
 		return nil, err
 	}
 	if to == 0 {
-		return c, err
+		return c, nil
 	}
 	err = c.SetReadDeadline(time.Now().Add(to))
 	if err != nil {
